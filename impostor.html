@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Impostor</title>
+<style>
+  :root{
+    --bg: #16171b;
+    --bg-panel: #1e2026;
+    --card-back: #23262e;
+    --card-front: #2c2f38;
+    --ink: #e8e6df;
+    --muted: #8b8d97;
+    --accent: #d6b24c;
+    --accent-dim: #7a6a34;
+    --impostor: #b0483f;
+    --line: #33363f;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Georgia', 'Iowan Old Style', serif;
+    -webkit-tap-highlight-color: transparent;
+    user-select:none;
+  }
+  #app{
+    min-height:100dvh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:28px 18px 40px;
+  }
+  .wrap{ width:100%; max-width:420px; margin:0 auto; }
+
+  h1{
+    font-size: 1.9rem;
+    font-weight:400;
+    letter-spacing:0.02em;
+    margin: 6px 0 2px;
+    text-align:center;
+  }
+  h1 .accent{ color:var(--accent); font-style:italic; }
+  .subtitle{
+    text-align:center;
+    color:var(--muted);
+    font-size:0.92rem;
+    margin-bottom: 30px;
+    font-family: -apple-system, sans-serif;
+  }
+
+  .panel{
+    background: var(--bg-panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 22px 20px;
+  }
+
+  label{
+    display:block;
+    font-family: -apple-system, sans-serif;
+    font-size:0.82rem;
+    color: var(--muted);
+    margin-bottom:8px;
+  }
+
+  .stepper{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    background: var(--card-back);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding: 4px;
+    margin-bottom:20px;
+  }
+  .stepper button{
+    width:44px; height:44px;
+    background:none;
+    border:none;
+    color:var(--ink);
+    font-size:1.4rem;
+    cursor:pointer;
+    font-family: -apple-system, sans-serif;
+  }
+  .stepper button:active{ color:var(--accent); }
+  .stepper .count{
+    font-size:1.6rem;
+    min-width:60px;
+    text-align:center;
+    font-family: -apple-system, sans-serif;
+  }
+
+  .wordlist-select{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    margin-bottom:22px;
+  }
+  .chip{
+    font-family: -apple-system, sans-serif;
+    font-size:0.82rem;
+    padding:8px 13px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    background:transparent;
+    color:var(--muted);
+    cursor:pointer;
+  }
+  .chip.active{
+    border-color: var(--accent-dim);
+    color: var(--accent);
+    background: rgba(214,178,76,0.08);
+  }
+
+  .btn-primary{
+    width:100%;
+    padding:15px;
+    background: var(--accent);
+    color: #1a1a1a;
+    border:none;
+    border-radius:3px;
+    font-family: -apple-system, sans-serif;
+    font-size:1rem;
+    font-weight:600;
+    cursor:pointer;
+    letter-spacing:0.01em;
+  }
+  .btn-primary:active{ background: #c2a03f; }
+  .btn-sticky-top{
+    position: sticky;
+    top: 10px;
+    z-index: 5;
+    margin-bottom: 4px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.35);
+  }
+
+  .btn-secondary{
+    width:100%;
+    padding:13px;
+    background:none;
+    color: var(--muted);
+    border:1px solid var(--line);
+    border-radius:3px;
+    font-family: -apple-system, sans-serif;
+    font-size:0.9rem;
+    cursor:pointer;
+    margin-top:10px;
+  }
+
+  /* --- deck screen --- */
+  #deckScreen{ display:none; width:100%; text-align:center; }
+  .deck-status{
+    font-family: -apple-system, sans-serif;
+    color:var(--muted);
+    font-size:0.85rem;
+    margin-bottom:26px;
+    letter-spacing:0.03em;
+  }
+  .deck-status b{ color:var(--accent); font-weight:600; }
+
+  .card-stage{
+    position:relative;
+    width: 260px;
+    height: 340px;
+    margin: 0 auto 26px;
+    perspective: 1200px;
+  }
+  .card{
+    position:absolute;
+    inset:0;
+    border-radius:10px;
+    cursor:pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.6s cubic-bezier(.22,.61,.36,1);
+  }
+  .card.flipped{ transform: rotateY(180deg); }
+  .card-face{
+    position:absolute; inset:0;
+    border-radius:10px;
+    backface-visibility:hidden;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+  }
+  .card-back{
+    background:
+      repeating-linear-gradient(135deg, var(--card-back), var(--card-back) 10px, #262933 10px, #262933 20px);
+    border:1px solid var(--line);
+  }
+  .card-back .mark{
+    font-size:2.6rem;
+    color: var(--accent-dim);
+    font-style:italic;
+  }
+  .card-back .tap-hint{
+    position:absolute;
+    bottom:26px;
+    font-family:-apple-system, sans-serif;
+    font-size:0.75rem;
+    color:var(--muted);
+    letter-spacing:0.05em;
+  }
+  .card-front{
+    background: var(--card-front);
+    border:1px solid var(--line);
+    transform: rotateY(180deg);
+  }
+  .card-front.is-impostor{ background: #3a2320; border-color: var(--impostor); }
+
+  .front-label{
+    font-family:-apple-system, sans-serif;
+    font-size:0.72rem;
+    letter-spacing:0.1em;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .front-word{
+    font-size:1.7rem;
+    text-align:center;
+    line-height:1.25;
+  }
+  .front-word.impostor-word{ color: var(--impostor-text, #e0776b); font-style:italic; }
+  .front-hint{
+    margin-top:18px;
+    font-family:-apple-system, sans-serif;
+    font-size:0.78rem;
+    color: var(--muted);
+    text-align:center;
+    line-height:1.5;
+  }
+
+  .btn-next{
+    width: 100%;
+    max-width:260px;
+    margin: 0 auto;
+    padding:14px;
+    background:none;
+    color: var(--muted);
+    border:1px solid var(--line);
+    border-radius:3px;
+    font-family:-apple-system, sans-serif;
+    font-size:0.9rem;
+    cursor:pointer;
+    display:none;
+  }
+
+  /* --- reveal all screen --- */
+  #revealScreen{ display:none; width:100%; }
+  #revealScreen .panel{ text-align:center; }
+  #revealScreen .word-final{
+    font-size:1.5rem;
+    color:var(--accent);
+    margin: 14px 0 4px;
+  }
+  #revealScreen .impostor-final{
+    font-size:1.1rem;
+    color: var(--impostor);
+    font-family:-apple-system, sans-serif;
+    margin-bottom:22px;
+  }
+
+  .name-row{ margin-bottom:8px; }
+  .name-input{
+    width:100%;
+    padding:11px 12px;
+    background: var(--card-back);
+    border:1px solid var(--line);
+    border-radius:3px;
+    color: var(--ink);
+    font-family: -apple-system, sans-serif;
+    font-size:0.92rem;
+  }
+  .name-input:focus{ outline:none; border-color: var(--accent-dim); }
+  #namesContainer{ margin-bottom:22px; }
+
+  /* --- handoff screen --- */
+  #handoffScreen{ display:none; width:100%; text-align:center; }
+  #handoffScreen .panel{ padding:36px 20px; }
+  #handoffScreen .handoff-label{
+    font-family:-apple-system, sans-serif;
+    font-size:0.78rem;
+    letter-spacing:0.08em;
+    color: var(--muted);
+    margin-bottom:10px;
+  }
+  #handoffScreen .handoff-name{
+    font-size:2.1rem;
+    color: var(--accent);
+    margin-bottom:26px;
+    word-break:break-word;
+  }
+
+  .order-list{
+    font-family: -apple-system, sans-serif;
+    font-size:0.85rem;
+    color: var(--muted);
+    text-align:left;
+    line-height:1.9;
+    margin-bottom:22px;
+    padding:14px 16px;
+    background: var(--card-back);
+    border-radius:3px;
+    border:1px solid var(--line);
+  }
+  .order-list div span{ color: var(--ink); }
+
+  .footer-note{
+    text-align:center;
+    color: var(--line);
+    font-family:-apple-system, sans-serif;
+    font-size:0.7rem;
+    margin-top:30px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+<div class="wrap">
+
+  <!-- SETUP -->
+  <div id="setupScreen">
+    <h1>El <span class="accent">Impostor</span></h1>
+    <p class="subtitle">Todos ven la palabra secreta. Uno no.</p>
+
+    <div class="panel">
+      <label>Número de jugadores</label>
+      <div class="stepper">
+        <button onclick="changePlayers(-1)">−</button>
+        <div class="count" id="playerCount">4</div>
+        <button onclick="changePlayers(1)">+</button>
+      </div>
+
+      <button class="btn-primary btn-sticky-top" onclick="startGame()">Repartir cartas</button>
+
+      <label style="margin-top:20px;">Nombres de los jugadores</label>
+      <div id="namesContainer"></div>
+    </div>
+    <p class="footer-note">Pasad el móvil de mano en mano.</p>
+  </div>
+
+  <!-- HANDOFF (pasar el móvil al siguiente jugador) -->
+  <div id="handoffScreen">
+    <div class="panel">
+      <div class="handoff-label">DALE EL MÓVIL A</div>
+      <div class="handoff-name" id="handoffName">—</div>
+      <button class="btn-primary" onclick="confirmHandoff()">Ya lo tengo, ver mi carta</button>
+    </div>
+  </div>
+
+  <!-- DECK / CARD FLOW -->
+  <div id="deckScreen">
+    <h1 style="font-size:1.4rem; margin-bottom:4px;">Turno de <span class="accent" id="turnNumber">—</span></h1>
+    <div class="deck-status">Quedan <b id="cardsLeft">4</b> cartas por ver</div>
+
+    <div class="card-stage">
+      <div class="card" id="theCard" onclick="handleCardClick()">
+        <div class="card-face card-back">
+          <div class="mark">?</div>
+          <div class="tap-hint">TOCA PARA VER TU CARTA</div>
+        </div>
+        <div class="card-face card-front" id="cardFront">
+          <div class="front-label" id="frontLabel">PALABRA SECRETA</div>
+          <div class="front-word" id="frontWord">—</div>
+          <div class="front-hint" id="frontHint">No la digas en voz alta. Memorízala y pasa el móvil al siguiente jugador.</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-next" id="nextBtn" onclick="nextCard()">Pasar el móvil →</button>
+  </div>
+
+  <!-- END SCREEN -->
+  <div id="revealScreen">
+    <h1 style="font-size:1.5rem;">Todas las cartas repartidas</h1>
+    <div class="panel">
+      <div class="order-list" id="orderList"></div>
+      <div id="preReveal">
+        <div style="font-family:-apple-system, sans-serif; font-size:0.85rem; color:var(--muted); line-height:1.6; margin-bottom:22px;">
+          Dejad el móvil en el centro. Cada jugador describe la palabra por turnos y luego votáis quién creéis que es el impostor.
+        </div>
+        <button class="btn-primary" onclick="revealWord()">Revelar palabra y resultado</button>
+        <div style="font-family:-apple-system, sans-serif; font-size:0.72rem; color:var(--line); margin-top:12px;">
+          Pulsa esto solo cuando ya hayáis votado, para no dar pistas.
+        </div>
+      </div>
+      <div id="postReveal" style="display:none;">
+        <div style="font-family:-apple-system, sans-serif; font-size:0.8rem; color:var(--muted);">LA PALABRA ERA</div>
+        <div class="word-final" id="finalWord">—</div>
+        <div class="impostor-final">El impostor no la vio. ¿Acertasteis quién era?</div>
+      </div>
+      <button class="btn-secondary" onclick="resetGame()">Nueva partida</button>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<script>
+const WORDS = [
+  "Nostalgia","Resaca","Siesta","Contraseña","Alergia","Insomnio","Envidia","Procrastinar",
+  "Terremoto","Divorcio","Selfie","Propina","Cuarentena","Chantaje","Karma","Ansiedad",
+  "Herencia","Vergüenza","Rumor","Coartada","Traición","Soborno","Estafa","Adicción",
+  "Cicatriz","Duelo","Vacío","Silencio","Rutina","Crisis","Despedida","Reencuentro",
+  "Improvisación","Superstición","Deja vu","Ego","Complejo","Trauma","Manía","Instinto",
+  "Frontera","Exilio","Clandestino","Rehén","Testigo","Sospecha","Indirecta","Excusa",
+  "Perdón","Venganza","Impostor","Doble vida","Secta","Dictadura","Revolución","Censura",
+  "Plagio","Falsificación","Amnesia","Hipnosis","Telepatía","Reencarnación","Fantasma",
+  "Maldición","Profecía","Sacrificio","Ritual","Oráculo","Laberinto","Espejismo"
+];
+
+let state = {
+  players: 4,
+  names: [],        // nombre de cada jugador, index = "identidad" real del jugador
+  order: [],        // orden de reparto de esta partida: array de índices de "names", barajado
+  turnPos: 0,       // posición actual dentro de "order" (0..players-1)
+  impostorIndex: -1,// índice (sobre "names") del jugador impostor — SIEMPRE exactamente uno
+  secretWord: ""
+};
+
+// Genera un input de texto por jugador, conservando lo ya escrito si solo cambia el conteo.
+function buildNameInputs(){
+  const container = document.getElementById('namesContainer');
+  const previousValues = Array.from(container.querySelectorAll('.name-input')).map(i => i.value);
+  container.innerHTML = '';
+  for(let i = 0; i < state.players; i++){
+    const row = document.createElement('div');
+    row.className = 'name-row';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'name-input';
+    input.placeholder = 'Jugador ' + (i + 1);
+    input.maxLength = 18;
+    input.value = previousValues[i] || '';
+    row.appendChild(input);
+    container.appendChild(row);
+  }
+}
+
+function changePlayers(delta){
+  state.players = Math.min(12, Math.max(3, state.players + delta));
+  document.getElementById('playerCount').textContent = state.players;
+  buildNameInputs();
+}
+
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i = a.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function startGame(){
+  const pool = WORDS;
+  state.secretWord = pool[Math.floor(Math.random()*pool.length)];
+
+  // Recoge los nombres escritos (o un nombre por defecto si alguien lo dejó vacío)
+  const inputs = document.querySelectorAll('#namesContainer .name-input');
+  state.names = Array.from(inputs).map((input, i) =>
+    input.value.trim() ? input.value.trim() : ('Jugador ' + (i + 1))
+  );
+
+  // Orden de reparto distinto en cada partida: se baraja el índice de cada jugador
+  state.order = shuffle([...Array(state.players).keys()]);
+
+  // Exactamente un impostor, elegido al azar entre cualquiera de los n jugadores (índice real)
+  state.impostorIndex = Math.floor(Math.random() * state.players);
+
+  state.turnPos = 0;
+
+  document.getElementById('setupScreen').style.display = 'none';
+  showHandoff();
+}
+
+const FLIP_MS = 600; // debe coincidir con la duración de transición del CSS (.card)
+
+// El "jugador real" (índice en state.names) al que le toca ahora, según el orden barajado
+function currentPlayerIndex(){
+  return state.order[state.turnPos];
+}
+
+// Actualiza SOLO el contenido interior de la carta (label, palabra, pista).
+// Se llama únicamente cuando la carta ya está boca abajo (no visible), nunca a mitad de giro.
+function loadCardContent(){
+  const front = document.getElementById('cardFront');
+  const frontWord = document.getElementById('frontWord');
+  const frontLabel = document.getElementById('frontLabel');
+  const frontHint = document.getElementById('frontHint');
+
+  const isImpostor = (currentPlayerIndex() === state.impostorIndex);
+  front.classList.toggle('is-impostor', isImpostor);
+
+  if(isImpostor){
+    frontLabel.textContent = 'TU CARTA';
+    frontWord.textContent = 'IMPOSTOR';
+    frontWord.classList.add('impostor-word');
+    frontHint.textContent = 'No conoces la palabra. Escucha a los demás y disimula.';
+  } else {
+    frontLabel.textContent = 'PALABRA SECRETA';
+    frontWord.textContent = state.secretWord;
+    frontWord.classList.remove('impostor-word');
+    frontHint.textContent = 'No la digas en voz alta. Memorízala y pasa el móvil al siguiente jugador.';
+  }
+}
+
+// Actualiza los textos de cabecera (fuera de la carta, no hay riesgo de fuga visual)
+function updateHeader(){
+  document.getElementById('turnNumber').textContent = state.names[currentPlayerIndex()];
+  document.getElementById('cardsLeft').textContent = state.players - state.turnPos;
+}
+
+// Pantalla intermedia: se muestra el nombre de quien debe coger el móvil ahora.
+// Se usa tanto para la primera carta como entre cartas, para que quede claro a quién pasarlo.
+function showHandoff(){
+  document.getElementById('deckScreen').style.display = 'none';
+  document.getElementById('handoffScreen').style.display = 'block';
+  document.getElementById('handoffName').textContent = state.names[currentPlayerIndex()];
+}
+
+// El jugador confirma que ya tiene el móvil en la mano: se muestra su carta boca abajo, lista para tocar.
+function confirmHandoff(){
+  document.getElementById('handoffScreen').style.display = 'none';
+  document.getElementById('deckScreen').style.display = 'block';
+
+  const card = document.getElementById('theCard');
+  card.classList.remove('flipped');
+  document.getElementById('nextBtn').style.display = 'none';
+
+  loadCardContent();
+  updateHeader();
+}
+
+// Un único punto de entrada para el toque sobre la carta:
+// boca abajo -> la voltea; ya boca arriba (visible) -> actúa igual que "Pasar el móvil",
+// por si alguien toca la carta en vez de pulsar el botón.
+function handleCardClick(){
+  const card = document.getElementById('theCard');
+  if(card.classList.contains('flipped')){
+    nextCard();
+  } else {
+    flipCard();
+  }
+}
+
+function flipCard(){
+  const card = document.getElementById('theCard');
+  if(card.classList.contains('flipped')) return;
+  card.classList.add('flipped');
+  document.getElementById('nextBtn').style.display = 'block';
+}
+
+function nextCard(){
+  const card = document.getElementById('theCard');
+  document.getElementById('nextBtn').style.display = 'none';
+  // Empieza a girar la carta de vuelta hacia boca abajo YA.
+  card.classList.remove('flipped');
+
+  // Solo cuando el giro ha terminado del todo (carta ya de espaldas) avanzamos de turno.
+  // Así nadie ve el contenido de refilón durante el giro.
+  setTimeout(() => {
+    state.turnPos++;
+    if(state.turnPos >= state.players){
+      document.getElementById('deckScreen').style.display = 'none';
+      document.getElementById('revealScreen').style.display = 'block';
+      // Importante: NO rellenamos ni mostramos la palabra aquí. El último jugador
+      // en pasar la carta podría ser el impostor, así que la palabra solo debe
+      // aparecer cuando alguien pulse "Revelar" de forma consciente, tras votar.
+      document.getElementById('preReveal').style.display = 'block';
+      document.getElementById('postReveal').style.display = 'none';
+      renderOrderList();
+      return;
+    }
+    showHandoff();
+  }, FLIP_MS);
+}
+
+// Muestra el orden en que se repartieron las cartas (no revela quién es el impostor).
+function renderOrderList(){
+  const list = document.getElementById('orderList');
+  list.innerHTML = '';
+  const heading = document.createElement('div');
+  heading.style.color = 'var(--ink)';
+  heading.style.marginBottom = '6px';
+  heading.textContent = 'Orden de la ronda:';
+  list.appendChild(heading);
+  state.order.forEach((playerIdx, i) => {
+    const row = document.createElement('div');
+    const span = document.createElement('span');
+    span.textContent = state.names[playerIdx];
+    row.appendChild(document.createTextNode((i + 1) + '. '));
+    row.appendChild(span);
+    list.appendChild(row);
+  });
+}
+
+function revealWord(){
+  document.getElementById('finalWord').textContent = state.secretWord;
+  document.getElementById('preReveal').style.display = 'none';
+  document.getElementById('postReveal').style.display = 'block';
+}
+
+function resetGame(){
+  document.getElementById('revealScreen').style.display = 'none';
+  document.getElementById('setupScreen').style.display = 'block';
+}
+
+buildNameInputs();
+</script>
+</body>
+</html>
