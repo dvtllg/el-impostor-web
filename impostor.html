@@ -278,6 +278,29 @@
   .name-input:focus{ outline:none; border-color: var(--accent-dim); }
   #namesContainer{ margin-bottom:22px; }
 
+  .custom-words-input{
+    width:100%;
+    padding:11px 12px;
+    background: var(--card-back);
+    border:1px solid var(--line);
+    border-radius:3px;
+    color: var(--ink);
+    font-family: -apple-system, sans-serif;
+    font-size:0.88rem;
+    resize:vertical;
+  }
+  .custom-words-input:focus{ outline:none; border-color: var(--accent-dim); }
+  .hint-small{
+    font-family:-apple-system, sans-serif;
+    font-size:0.72rem;
+    color: var(--line);
+    margin-top:6px;
+    margin-bottom:20px;
+  }
+
+  /* --- resume screen --- */
+  #resumeScreen{ display:none; width:100%; }
+
   /* --- handoff screen --- */
   #handoffScreen{ display:none; width:100%; text-align:center; }
   #handoffScreen .panel{ padding:36px 20px; }
@@ -322,6 +345,18 @@
 <div id="app">
 <div class="wrap">
 
+  <!-- RESUME (aparece solo si detecta una partida sin terminar guardada en este dispositivo) -->
+  <div id="resumeScreen">
+    <div class="panel" style="text-align:center;">
+      <h1 style="font-size:1.3rem;">Partida sin terminar</h1>
+      <div class="hint-small" style="margin-bottom:22px; font-size:0.82rem;">
+        Parece que la página se cerró a medias. ¿Qué queréis hacer?
+      </div>
+      <button class="btn-primary" onclick="resumeGame()">Continuar donde lo dejamos</button>
+      <button class="btn-secondary" onclick="discardSavedGame()">Empezar partida nueva</button>
+    </div>
+  </div>
+
   <!-- SETUP -->
   <div id="setupScreen">
     <h1>El <span class="accent">Impostor</span></h1>
@@ -339,6 +374,11 @@
 
       <label style="margin-top:20px;">Nombres de los jugadores</label>
       <div id="namesContainer"></div>
+
+      <label style="margin-top:6px;">Palabras propias (opcional)</label>
+      <textarea id="customWordsInput" class="custom-words-input" rows="2"
+        placeholder="Sepáralas por comas: ej. Batalla naval, Cita a ciegas, Falso positivo"></textarea>
+      <div class="hint-small">Se suman a la lista base. Solo se usan en esta partida.</div>
     </div>
     <p class="footer-note">Pasad el móvil de mano en mano.</p>
   </div>
@@ -391,7 +431,8 @@
       <div id="postReveal" style="display:none;">
         <div style="font-family:-apple-system, sans-serif; font-size:0.8rem; color:var(--muted);">LA PALABRA ERA</div>
         <div class="word-final" id="finalWord">—</div>
-        <div class="impostor-final">El impostor no la vio. ¿Acertasteis quién era?</div>
+        <div style="font-family:-apple-system, sans-serif; font-size:0.8rem; color:var(--muted); margin-top:16px;">EL IMPOSTOR ERA</div>
+        <div class="word-final" id="finalImpostor" style="color:var(--impostor);">—</div>
       </div>
       <button class="btn-secondary" onclick="resetGame()">Nueva partida</button>
     </div>
@@ -410,8 +451,23 @@ const WORDS = [
   "Frontera","Exilio","Clandestino","Rehén","Testigo","Sospecha","Indirecta","Excusa",
   "Perdón","Venganza","Impostor","Doble vida","Secta","Dictadura","Revolución","Censura",
   "Plagio","Falsificación","Amnesia","Hipnosis","Telepatía","Reencarnación","Fantasma",
-  "Maldición","Profecía","Sacrificio","Ritual","Oráculo","Laberinto","Espejismo"
+  "Maldición","Profecía","Sacrificio","Ritual","Oráculo","Laberinto","Espejismo",
+  "Cotilleo","Infidelidad","Ultimátum","Alibí","Complot","Infiltrado","Doble agente",
+  "Amenaza","Rescate","Fianza","Motín","Golpe de estado","Desfalco","Lavado de dinero",
+  "Anonimato","Vigilancia","Rehabilitación","Recaída","Confesión","Perjurio","Coacción",
+  "Manipulación","Gaslighting","Ghosting","Triángulo amoroso","Herido de gravedad",
+  "Testamento","Paternidad","Adopción","Custodia","Desahucio","Bancarrota","Hipoteca",
+  "Jubilación anticipada","Despido","Acoso laboral","Enchufismo","Nepotismo","Burocracia",
+  "Cadena perpetua","Libertad condicional","Fuga","Búsqueda y captura","Testigo protegido",
+  "Doble identidad","Máscara","Disfraz","Impostura","Simulacro","Falsa alarma","Pánico",
+  "Multitud","Aislamiento","Cuarentena forzosa","Toque de queda","Apagón","Escasez",
+  "Especulación","Burbuja económica","Inflación","Desigualdad","Corrupción","Impunidad",
+  "Justicia poética","Segunda oportunidad","Punto de no retorno","Crisis existencial",
+  "Síndrome del impostor","Zona de confort","Efecto mariposa","Profecía autocumplida"
 ];
+
+// Palabras que el propio grupo añada desde la pantalla de configuración (opcional).
+let customWords = [];
 
 let state = {
   players: 4,
@@ -457,7 +513,12 @@ function shuffle(arr){
 }
 
 function startGame(){
-  const pool = WORDS;
+  // Recoge palabras propias del textarea (si hay) y las suma a la lista base
+  const customRaw = document.getElementById('customWordsInput').value;
+  customWords = customRaw.split(',')
+    .map(w => w.trim())
+    .filter(w => w.length > 0);
+  const pool = WORDS.concat(customWords);
   state.secretWord = pool[Math.floor(Math.random()*pool.length)];
 
   // Recoge los nombres escritos (o un nombre por defecto si alguien lo dejó vacío)
@@ -479,6 +540,95 @@ function startGame(){
 }
 
 const FLIP_MS = 600; // debe coincidir con la duración de transición del CSS (.card)
+const STORAGE_KEY = 'impostor_game_v1';
+
+// Guarda el estado actual + en qué pantalla estamos, para poder retomar la partida
+// si se cierra el navegador. Si localStorage no está disponible, falla en silencio
+// (el juego sigue funcionando, simplemente sin persistencia).
+function saveGameState(screen){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      players: state.players,
+      names: state.names,
+      order: state.order,
+      turnPos: state.turnPos,
+      impostorIndex: state.impostorIndex,
+      secretWord: state.secretWord,
+      screen: screen
+    }));
+  }catch(e){ /* sin persistencia disponible, no es crítico */ }
+}
+
+function loadGameState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  }catch(e){ return null; }
+}
+
+function clearGameState(){
+  try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+}
+
+function hideAllScreens(){
+  ['resumeScreen','setupScreen','handoffScreen','deckScreen','revealScreen'].forEach(id=>{
+    document.getElementById(id).style.display = 'none';
+  });
+}
+
+// El jugador confirma que quiere seguir con la partida guardada: reconstruye el
+// estado y muestra exactamente la pantalla en la que se quedó.
+function resumeGame(){
+  const saved = loadGameState();
+  if(!saved){ discardSavedGame(); return; }
+
+  state.players = saved.players;
+  state.names = saved.names;
+  state.order = saved.order;
+  state.turnPos = saved.turnPos;
+  state.impostorIndex = saved.impostorIndex;
+  state.secretWord = saved.secretWord;
+
+  hideAllScreens();
+
+  if(saved.screen === 'deck-flipped'){
+    document.getElementById('deckScreen').style.display = 'block';
+    loadCardContent();
+    updateHeader();
+    const card = document.getElementById('theCard');
+    card.classList.add('flipped');
+    document.getElementById('nextBtn').style.display = 'block';
+  } else if(saved.screen === 'deck'){
+    document.getElementById('deckScreen').style.display = 'block';
+    const card = document.getElementById('theCard');
+    card.classList.remove('flipped');
+    document.getElementById('nextBtn').style.display = 'none';
+    loadCardContent();
+    updateHeader();
+  } else if(saved.screen === 'reveal-pre'){
+    document.getElementById('revealScreen').style.display = 'block';
+    document.getElementById('preReveal').style.display = 'block';
+    document.getElementById('postReveal').style.display = 'none';
+    renderOrderList();
+  } else if(saved.screen === 'reveal-post'){
+    document.getElementById('revealScreen').style.display = 'block';
+    document.getElementById('preReveal').style.display = 'none';
+    document.getElementById('postReveal').style.display = 'block';
+    document.getElementById('finalWord').textContent = state.secretWord;
+    document.getElementById('finalImpostor').textContent = state.names[state.impostorIndex];
+    renderOrderList();
+  } else {
+    // 'handoff' o cualquier otro caso: mostramos a quién le toca coger el móvil ahora
+    showHandoff();
+  }
+}
+
+function discardSavedGame(){
+  clearGameState();
+  hideAllScreens();
+  document.getElementById('setupScreen').style.display = 'block';
+  buildNameInputs();
+}
 
 // El "jugador real" (índice en state.names) al que le toca ahora, según el orden barajado
 function currentPlayerIndex(){
@@ -521,6 +671,7 @@ function showHandoff(){
   document.getElementById('deckScreen').style.display = 'none';
   document.getElementById('handoffScreen').style.display = 'block';
   document.getElementById('handoffName').textContent = state.names[currentPlayerIndex()];
+  saveGameState('handoff');
 }
 
 // El jugador confirma que ya tiene el móvil en la mano: se muestra su carta boca abajo, lista para tocar.
@@ -534,6 +685,7 @@ function confirmHandoff(){
 
   loadCardContent();
   updateHeader();
+  saveGameState('deck');
 }
 
 // Un único punto de entrada para el toque sobre la carta:
@@ -553,6 +705,7 @@ function flipCard(){
   if(card.classList.contains('flipped')) return;
   card.classList.add('flipped');
   document.getElementById('nextBtn').style.display = 'block';
+  saveGameState('deck-flipped');
 }
 
 function nextCard(){
@@ -574,6 +727,7 @@ function nextCard(){
       document.getElementById('preReveal').style.display = 'block';
       document.getElementById('postReveal').style.display = 'none';
       renderOrderList();
+      saveGameState('reveal-pre');
       return;
     }
     showHandoff();
@@ -601,16 +755,28 @@ function renderOrderList(){
 
 function revealWord(){
   document.getElementById('finalWord').textContent = state.secretWord;
+  document.getElementById('finalImpostor').textContent = state.names[state.impostorIndex];
   document.getElementById('preReveal').style.display = 'none';
   document.getElementById('postReveal').style.display = 'block';
+  saveGameState('reveal-post');
 }
 
 function resetGame(){
+  clearGameState();
   document.getElementById('revealScreen').style.display = 'none';
   document.getElementById('setupScreen').style.display = 'block';
+  buildNameInputs();
 }
 
-buildNameInputs();
+// Al cargar la página: si hay una partida sin terminar guardada en este dispositivo,
+// se ofrece continuarla; si no, se abre la configuración normal.
+const savedOnLoad = loadGameState();
+if(savedOnLoad && savedOnLoad.screen){
+  document.getElementById('setupScreen').style.display = 'none';
+  document.getElementById('resumeScreen').style.display = 'block';
+} else {
+  buildNameInputs();
+}
 </script>
 </body>
 </html>
